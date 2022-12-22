@@ -1,6 +1,6 @@
 {
 {
-setwd("../2021_SPEER/Sonstiges/Backup step 2")
+setwd("../Sonstiges/Backup step 2")
 
   
 #install/load packages
@@ -170,6 +170,7 @@ summary$resp_raw  <- (summary$estimate_s*-206)
 hr <- read.csv("../../Hintergrundrespiration/Conze/HR.csv", header = T, sep =";")
 summary <- merge(summary, hr, by.x = c("tunnel"), by.y = c("tunnel"))
 summary$hr_calc <- summary$hr*1.83027^((summary$temp_mean-summary$hr_temp)/10)
+summary$resp_absol <- summary$resp_raw-summary$hr_calc
 summary$resp <- (summary$resp_raw - summary$hr_calc)/(summary$mass/1000)
 
 
@@ -178,7 +179,7 @@ summary$speedBL <- summary$speed_mean/(summary$length/100)
 
 #order the "summary" data frame
 summary <- summary[,! names(summary) %in% c("trainingstart", "max_ID_time_num", "ID_time_num", "max_ID_time","hr_calc", "resp_kg", "hr", "hr_temp"), drop = F]
-col_order <- c("ID", "datetime_min", "datetime_max", "m_time_max", "resp", "resp_raw", "ntemp", "temp_min", "temp_mean", "temp_max", "npress", "press_min", "press_mean", "press_max",  "n", "estimate_s", "std.error_s", "p.value_s", "conc_max", "conc_min", "conc_mean", "conc_sd", "temp_sd", "press_sd", "speed_min", "speed_max", "speed_mean", "speed_sd", "sat_min", "sat_max", "sat_mean", "sat_sd", "temp_s_min", "temp_s_max", "press_s_min", "press_s_max", "speed_s_min", "speed_s_max", "run", "tunnel", "no", "adj.r.squared_lm", "sigma_lm", "p.value_lm", "deviance_lm", "df.residual_lm", "estimate_i", "std.error_i", "p.value_i", "timediff_max", "ID_time","mass", "startmass", "endmass", "length", "stage", "speedBL", "back_true", "back_false", "front_true", "front_false")
+col_order <- c("ID", "datetime_min", "datetime_max", "m_time_max", "resp", "resp_raw", "resp_absol", "ntemp", "temp_min", "temp_mean", "temp_max", "npress", "press_min", "press_mean", "press_max",  "n", "estimate_s", "std.error_s", "p.value_s", "conc_max", "conc_min", "conc_mean", "conc_sd", "temp_sd", "press_sd", "speed_min", "speed_max", "speed_mean", "speed_sd", "sat_min", "sat_max", "sat_mean", "sat_sd", "temp_s_min", "temp_s_max", "press_s_min", "press_s_max", "speed_s_min", "speed_s_max", "run", "tunnel", "no", "adj.r.squared_lm", "sigma_lm", "p.value_lm", "deviance_lm", "df.residual_lm", "estimate_i", "std.error_i", "p.value_i", "timediff_max", "ID_time","mass", "startmass", "endmass", "length", "stage", "speedBL", "back_true", "back_false", "front_true", "front_false")
 summary <- summary[, col_order]
 
 summary_raw1 <- summary
