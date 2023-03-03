@@ -5,12 +5,16 @@ output:
   pdf_document: default
   word_document: default
 ---
+```{r setup}
+knitr::opts_knit$set(root.dir = './output')
+```
 
 ```{r Initial formatting, include=FALSE}
 knitr::opts_chunk$set(echo=FALSE)
 
 
-load("./summary_mod.RData")
+load("../summary_mod.RData")
+
 
 summary$ID_time <- as.numeric(summary$ID_time)
 summary$run <-as.factor(summary$run)
@@ -28,7 +32,6 @@ library(ggplot2)
 library(ggh4x)
 devtools::install_github("thomasp85/scico")
 library(scico)
-
 
 #create idealized dataframe with fixed speed for plotting
 ideal <- expand.grid(ID=unique(summary$ID),
@@ -55,6 +58,7 @@ ideal_1 <- ideal %>% filter(press_mean == 1)
 **Tab 1** Summary of biological and experimental paramaters for individual eels
 
 ```{r Tab 1}
+
 
 biomasses$ID <- biomasses$ID %>% str_replace_all(c("a" = "A", "b" = "B", "c" = "C", "d" = "D", "e" = "E", "f" = "F", "g" = "G", "h" = "H", "i" = "I"))
 
