@@ -83,7 +83,7 @@ align(flextable(biomasses %>%
                    speed_max = round(speed_max, 2),
                    "Velocity range (BL/s)" = paste(speed_min, speed_max, sep = " - ")) %>% 
             rename("Swim time (d)" = time_d,
-                   "Swimming distance (km)" = distance)) %>% 
+                   "Distance (km)" = distance)) %>% 
   colformat_num(big.mark   = "") %>%
   autofit(add_w = -0.5), align = "center", part = "all")
 ```
