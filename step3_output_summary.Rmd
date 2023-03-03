@@ -85,9 +85,13 @@ summ_by_ID <- summary %>%
                                  max_resp = max(resp),
                                  sd_resp = sd(resp),
                                  mean_temp = mean(temp_mean),
-                                 min_temp = min(temp_max),
-                                 max_temp = max(temp_min),
-                                 sd_temp = sd(temp_min)
+                                 min_temp = min(temp_mean),
+                                 max_temp = max(temp_mean),
+                                 sd_temp = sd(temp_mean),
+                                 mean_speed = mean(speedBL),
+                                 min_speed = min(speedBL),
+                                 max_speed = max(speedBL),
+                                 sd_speed = sd(speedBL)
                                  ) 
   
 
@@ -100,19 +104,27 @@ flextable(summ_by_ID %>%
                       temp_mean = round(mean(mean_temp), 1),
                       temp_sd = round(sd(mean_temp), 1),
                       temp_min = round(min(mean_temp), 1),
-                      temp_max = round(max(mean_temp), 1)
+                      temp_max = round(max(mean_temp), 1),
+                      speed_mean = round(mean(mean_speed), 2),
+                      speed_sd = round(sd(mean_speed), 2),
+                      speed_min = round(min(mean_speed), 2),
+                      speed_max = round(max(mean_speed), 2),
                                  ) %>% 
             mutate("Preset (temp/press)" = paste(ntemp, npress, sep = " / "),
                    resp_mean = paste(resp_mean, resp_sd, sep =" \u00B1 "), 
                    resp_range = paste(resp_min, resp_max, sep = " - "),
                    temp_mean = paste(temp_mean, temp_sd, sep =" \u00B1 "), 
-                   temp_range = paste(temp_min, temp_max, sep = " - ")) %>%
+                   temp_range = paste(temp_min, temp_max, sep = " - "),
+                   speed_mean = paste(speed_mean, speed_sd, sep =" \u00B1 "), 
+                   speed_range = paste(speed_min, speed_max, sep = " - ")) %>%
             ungroup() %>% 
-            select("Preset (temp/press)" , resp_mean, resp_range, temp_mean, temp_range) %>%
+            select("Preset (temp/press)" , resp_mean, resp_range, temp_mean, temp_range, speed_mean, speed_range) %>%
             rename("Mean oxygen consupmtion rates (mg/kg/h)" = resp_mean,
                  "Range of oxygen consumption rates (mg/kg/h)" = resp_range,
                  "Mean observed temperatures (°C)" = temp_mean,
-                 "Range of observed temperatures (°C)" = temp_range)
+                 "Range of observed temperatures (°C)" = temp_range,
+                 "Mean observed velocities (BL/s)" = speed_mean,
+                 "Range of velocities (BL/s)" = speed_range)
 ) %>% 
   autofit()
                      
@@ -328,16 +340,21 @@ addresp <- summ_by_ID %>%
   ungroup() %>% 
   mutate(indicator = paste(ID, ntemp, npress, sep = "_")) %>% 
   select(-ntemp, -npress, -ID) %>%
-  mutate_at(1:8, round, 1) %>% 
+  mutate_at(1:8, round, 1) %>%
+  mutate_at(8:12, round, 2) %>%
   mutate(t = paste(mean_temp, sd_temp, sep = " \u00B1 "),
          t_range = paste(min_temp, max_temp, sep = " - "),
          o = paste(mean_temp, sd_temp, sep = " \u00B1 "),
-         o_range = paste(min_temp, max_temp, sep = " - ")) %>% 
-  select(indicator, t, t_range, o, o_range) %>% 
-  rename("Mean experienced temperature (°C)" = t,
-         "Measured Temperature range (°C)" = t_range,
+         o_range = paste(min_temp, max_temp, sep = " - "),
+         s = paste(mean_speed, sd_speed, sep = " \u00B1 "),
+         s_range = paste(min_speed, max_speed, sep = " - ")) %>% 
+  select(indicator, t, t_range, o, o_range, s, s_range) %>% 
+  rename("Mean observed temperature (°C)" = t,
+         "Observed Temperature range (°C)" = t_range,
          "Mean oxygen consumption (mg/kg/h)" = o,
-         "Oxygen consumption range (mg/kg/h)" = o_range)
+         "Oxygen consumption range (mg/kg/h)" = o_range,
+         "Mean observed velocity (BL/s)" = s,
+         "Observed velocity range (BL/s)" = s_range)
          
 flextable(biomasses %>%
             select(ID, ID_old) %>% 
