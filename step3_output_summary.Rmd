@@ -79,7 +79,7 @@ align(flextable(biomasses %>%
 \
 \
 
-**Tab 2** Mean and range of observed temperatures at the three presets (12, 15.5 & 19°C) and respective oxygen consumption rates (mg/kg * h^-1), calculated as the arithmetic mean (and range) of mean temperatures and oxygen consumption rates per individual (for individual values see Tab S1). 
+**Tab 2** Mean and range of observed temperatures and velocities (at the respective presets) and resulting oxygen consumption rates (mg/kg * h^-1), calculated as the arithmetic mean (and range) of the mean per individual (for individual values see Tab S1). Observed pressure not shown since deviations from the nominal pressure were negligibly small 
 
 ```{r Tab 3}
 
@@ -124,11 +124,11 @@ flextable(summ_by_ID %>%
                    speed_range = paste(speed_min, speed_max, sep = " - ")) %>%
             ungroup() %>% 
             select("Nominal Temperature (°C) / Pressure (bar)" , resp_mean, resp_range, temp_mean, temp_range, speed_mean, speed_range) %>%
-            rename("Mean oxygen consupmtion rates (mg/kg/h)" = resp_mean,
+            rename("Mean oxygen consupmtion rate (mg/kg/h)" = resp_mean,
                  "Range of oxygen consumption rates (mg/kg/h)" = resp_range,
-                 "Mean observed temperatures (°C)" = temp_mean,
+                 "Mean observed temperature (°C)" = temp_mean,
                  "Range of observed temperatures (°C)" = temp_range,
-                 "Mean observed velocities (BL/s)" = speed_mean,
+                 "Mean observed velocity (BL/s)" = speed_mean,
                  "Range of velocities (BL/s)" = speed_range)
 ) %>% 
   autofit()
