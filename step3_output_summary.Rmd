@@ -110,7 +110,7 @@ flextable(summ_by_ID %>%
                       speed_min = round(min(mean_speed), 2),
                       speed_max = round(max(mean_speed), 2),
                                  ) %>% 
-            mutate("Preset (temp/press)" = paste(ntemp, npress, sep = " / "),
+            mutate("Nominal Temperature (°C) / Pressure (bar)" = paste(ntemp, npress, sep = " / "),
                    resp_mean = paste(resp_mean, resp_sd, sep =" \u00B1 "), 
                    resp_range = paste(resp_min, resp_max, sep = " - "),
                    temp_mean = paste(temp_mean, temp_sd, sep =" \u00B1 "), 
@@ -118,7 +118,7 @@ flextable(summ_by_ID %>%
                    speed_mean = paste(speed_mean, speed_sd, sep =" \u00B1 "), 
                    speed_range = paste(speed_min, speed_max, sep = " - ")) %>%
             ungroup() %>% 
-            select("Preset (temp/press)" , resp_mean, resp_range, temp_mean, temp_range, speed_mean, speed_range) %>%
+            select("Nominal Temperature (°C) / Pressure (bar)" , resp_mean, resp_range, temp_mean, temp_range, speed_mean, speed_range) %>%
             rename("Mean oxygen consupmtion rates (mg/kg/h)" = resp_mean,
                  "Range of oxygen consumption rates (mg/kg/h)" = resp_range,
                  "Mean observed temperatures (°C)" = temp_mean,
