@@ -1,16 +1,16 @@
 ---
 title: 'null'
 output:
-  word_document: default
   html_document: default
   pdf_document: default
+  word_document: default
 ---
 
 ```{r Initial formatting, include=FALSE}
 knitr::opts_chunk$set(echo=FALSE)
 
 
-load("./data/models_fitted_new.RData")
+load("./summary_mod.RData")
 
 summary$ID_time <- as.numeric(summary$ID_time)
 summary$run <-as.factor(summary$run)
@@ -18,7 +18,7 @@ summary$tunnel <-as.factor(summary$tunnel)
 summary$ID <- as.factor(summary$ID)
 summary$FR <- summary$front_true/(summary$front_false+summary$front_true)
 summary$ID_press <- paste(summary$ID, summary$npress, sep ="_")
-
+lme.final <- lme.plot
 
 library(nlme)
 library(MuMIn)
@@ -28,6 +28,24 @@ library(ggplot2)
 library(ggh4x)
 devtools::install_github("thomasp85/scico")
 library(scico)
+
+
+#create idealized dataframe with fixed speed for plotting
+ideal <- expand.grid(ID=unique(summary$ID),
+                     temp_mean=c(12:21),
+                     press_mean = c(1:8),
+                     speedBL = c(0.6)
+                  
+)
+
+ideal <- ideal %>% 
+  left_join(summary %>% select(ID, startmass, run, tunnel), by = "ID")
+
+ideal <- ideal %>%  distinct(.keep_all = T)
+
+ideal$resp <- exp(predict(lme.plot, newdata = ideal, group = ID))
+ideal$resp_glob <- exp(predict(lme.plot, newdata = ideal, level = "0"))
+ideal_1 <- ideal %>% filter(press_mean == 1)
 
 
 ```
@@ -55,16 +73,64 @@ align(flextable(biomasses %>%
 \
 \
 \
-**Tab 2** Short summary of the model statistics for main effects. Note, that value gives the change in the log of O2-consuption rate per change in one unit of the predictor.
+
+**Tab 2** Mean and range of observed temperatures at the three presets (12, 15.5 & 19°C) and respective oxygen consumption rates (mg/kg * h^-1), calculated as the arithmetic mean (and range) of mean temperatures and oxygen consumption rates per individual (for individual values see Tab S1). 
+
+```{r Tab 3}
+
+summ_by_ID <- summary %>% 
+            group_by(ID, ntemp, npress) %>% 
+                       summarize(mean_resp = mean(resp),
+                                 min_resp = min(resp),
+                                 max_resp = max(resp),
+                                 sd_resp = sd(resp),
+                                 mean_temp = mean(temp_mean),
+                                 min_temp = min(temp_max),
+                                 max_temp = max(temp_min),
+                                 sd_temp = sd(temp_min)
+                                 ) 
+  
+
+flextable(summ_by_ID %>%
+            group_by(ntemp, npress) %>% 
+            summarise(resp_mean = round(mean(mean_resp), 1),
+                      resp_sd = round(sd(mean_resp), 1),
+                      resp_min = round(min(mean_resp), 1),
+                      resp_max = round(max(mean_resp), 1),
+                      temp_mean = round(mean(mean_temp), 1),
+                      temp_sd = round(sd(mean_temp), 1),
+                      temp_min = round(min(mean_temp), 1),
+                      temp_max = round(max(mean_temp), 1)
+                                 ) %>% 
+            mutate("Preset (temp/press)" = paste(ntemp, npress, sep = " / "),
+                   resp_mean = paste(resp_mean, resp_sd, sep =" \u00B1 "), 
+                   resp_range = paste(resp_min, resp_max, sep = " - "),
+                   temp_mean = paste(temp_mean, temp_sd, sep =" \u00B1 "), 
+                   temp_range = paste(temp_min, temp_max, sep = " - ")) %>%
+            ungroup() %>% 
+            select("Preset (temp/press)" , resp_mean, resp_range, temp_mean, temp_range) %>%
+            rename("Mean oxygen consupmtion rates (mg/kg/h)" = resp_mean,
+                 "Range of oxygen consumption rates (mg/kg/h)" = resp_range,
+                 "Mean observed temperatures (°C)" = temp_mean,
+                 "Range of observed temperatures (°C)" = temp_range)
+) %>% 
+  autofit()
+                     
+
+
+```
+
+
+**Tab 3** Short summary of the model statistics for main effects. Note, that value gives the change in the log of O2-consuption rate per change in one unit of the predictor.
 
 ```{r Tab 2}
 
-intervals <- intervals(lme.final)
+intervals <- intervals(lme.plot)
 intervals <- data.frame(intervals$fixed)
 intervals <- intervals %>%
             rename(Lower_confidence_limit = lower,
                    Upper_confidence_limit = upper)
-result <- as.data.frame(coef(summary(lme.final)))
+result <- as.data.frame(coef(summary(lme.plot)))
 result$p <- result$'p-value'
 result$Parameter <- rownames(result)
 intervals$rownames <- rownames(intervals)
@@ -78,13 +144,9 @@ flextable(result %>%
          Value = round(Value, 3)) %>%
   select(c('Parameter', 'Value', 'Lower conf. limit', 'Upper conf. limit', 'p')) %>% 
   mutate(Parameter = if_else(Parameter == "(Intercept)", "Intercept", 
-                             if_else(Parameter == "temp_mean", "Temperature",
-                             if_else(Parameter == "press_mean", "Pressure",
-                             if_else(Parameter == "speedBL", "Flow rate",
-                             if_else(Parameter == "temp_mean", "Temperature",
-                             if_else(Parameter == "tunnel2", "Tunnel 2",
-                             if_else(Parameter == "tunnel3", "Tunnel 3",
-                             if_else(Parameter == "run2", "Run 2", "Run 3")))))))))) %>%
+                             if_else(Parameter == "temp_mean", "Temperature (°C)",
+                             if_else(Parameter == "press_mean", "Pressure (bar)",
+                             if_else(Parameter == "speedBL", "Velocity (BL/s)", "NA")))))) %>%
   autofit() 
  
 
@@ -102,31 +164,52 @@ flextable(result %>%
 
 ```{r Fig 1, dpi = 300}
 
-fig1 <- tag_facet2(
-  ggplot(summary, aes(x=ID_time, y=resp)) +
-  geom_point(aes(col = temp_mean, shape = as.factor(npress)), size=1.3, alpha = 0.5) +
+fig1a <- tag_facet2(
+  ggplot(summary, aes(x=ID_time, y=log(resp))) +
+  geom_point(aes(col = temp_mean, shape = as.factor(npress)), size=0.9, alpha = 0.5) +
   theme_bw()+
-  theme(text = element_text(size = 8, family = "sans")) +
-  theme(legend.key.size = unit(1.8, "cm"),
-        legend.key.width = unit(0.3, "cm"),
-        legend.title = element_blank())+
-  scale_shape_manual(values = c(1, 16))+
-  scale_colour_scico(palette = "batlow", name = "temp (°C)")+
-  geom_line(aes(x= ID_time, y=exp(predict(lme.final, level = 0))), size = 0.4)+
-  geom_line(aes(x= ID_time, y=exp(predict(lme.final)), group = ID), linetype = "dashed", size = 0.4)+
-  labs(x = expression(time~(h)), y = expression(O[2]-consumption ~(mg/kg %*% h^-1)))+
+  scale_shape_manual(values = c(1, 16), guide = "none")+
+  scale_colour_scico(palette = "batlow")+ # ,name = "temp (°C)" - this adds title for the specific legend
+  geom_line(aes(x= ID_time, y=predict(lme.plot, level = 0)), size = 0.4)+
+  geom_line(aes(x= ID_time, y=predict(lme.plot), group = ID), linetype = "dashed", size = 0.4)+
+  labs(x = expression(time~(h)), y = expression(ln~O[2]-consumption ~(mg/kg %*% h^-1)))+
   facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
-  guides(shape=FALSE),
-  open ="", close ="", hjust = -1.2) 
+  guides(scale="none"), open ="", close ="", hjust = -1.2) +
+  theme(legend.key.size = unit(3, "cm"),
+      legend.key.width = unit(0.3, "cm"),
+      legend.title = element_blank(),
+      text = element_text(size = 10, family = "sans"))
+
+#add plot with temp for qual check
+  ggplot(summary, aes(x=datetime_min, y=temp_mean)) +
+    geom_line(aes(col = tunnel))
+  
+  fig1b <- tag_facet2(
+  ggplot(summary, aes(x=ID_time, y=log(resp_absol))) +
+  geom_point(aes(col = temp_mean, shape = as.factor(npress)), size=0.9, alpha = 0.5) +
+  theme_bw()+
+  scale_shape_manual(values = c(1, 16), guide = "none")+
+  scale_colour_scico(palette = "batlow")+ # ,name = "temp (°C)" - this adds title for the specific legend
+  #geom_line(aes(x= ID_time, y=predict(lme.plot, level = 0)), size = 0.4)+
+  #geom_line(aes(x= ID_time, y=predict(lme.plot), group = ID), linetype = "dashed", size = 0.4)+
+  labs(x = expression(time~(h)), y = expression(ln~O[2]-consumption ~(mg %*% h^-1)))+
+  facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
+  guides(scale="none"), open ="", close ="", hjust = -1.2) +
+  theme(legend.key.size = unit(3, "cm"),
+      legend.key.width = unit(0.3, "cm"),
+      legend.title = element_blank(),
+      text = element_text(size = 10, family = "sans"))
 
 #add plot with temp for qual check
   ggplot(summary, aes(x=datetime_min, y=temp_mean)) +
     geom_line(aes(col = tunnel))
   
 
-ggsave("Fig1.pdf", fig1, device = "pdf", height = 7, width = 8, dpi = 300)
+ggsave("Fig1a.pdf", fig1a, device = "pdf", height = 7, width = 8, dpi = 300)
+ggsave("Fig1b.pdf", fig1b, device = "pdf", height = 7, width = 8, dpi = 300)
 
-fig1
+fig1a
+fig1b
 ```
 
 **Fig 1** Oxygen consumption rate per individual (a-i) over time different at temperatures (color scale) at 1 bar (open circles) and 8 bar (closed circles). Modeled predictions are displayed on the population level (solid line) and for the individual (dashed line). Colour indicates temp in °C\
@@ -137,29 +220,90 @@ fig1
 ```{r Fig 2, dpi = 300}
 
 
-ideal_summary <- ideal %>%
-  mutate(group = paste(temp_mean, press_mean, sep = "_")) %>% 
-  group_by(group) %>% 
-  summarize(mean = mean(resp),
-            sd = sd(resp))
+#ideal_summary <- ideal %>%
+#  mutate(group = paste(temp_mean, press_mean, sep = "_")) %>% 
+#  group_by(group) %>% 
+#  summarize(mean = mean(resp),
+#            sd = sd(resp))
 
-fig2 <- ggplot(ideal, aes(x=temp_mean, y=resp)) +
- theme_bw()+
-  theme(legend.key.width = unit(1.5, "cm"))+
-  theme(text = element_text(size = 8, family = "sans")) +
-  #geom_point(data = summary, aes(x=temp_mean, y = resp, shape = as.factor(npress)), size = 0.9, color = "grey75")+
-  #scale_shape_manual(values = c(1, 16))+
-  geom_smooth(aes(linetype = as.factor(press_mean)), se = F, color = "black", method = "loess", formula = y~x, size = 0.8)+
+
+
+fig2a <-  tag_facet2(ggplot(ideal_1, aes(x=temp_mean, y=resp)) +
+  #geom_point(aes(colour = temp_mean)), size=1)+ 
+  theme_bw()+
+  stat_smooth(data = ideal_1, aes(x= temp_mean, y=resp, color = ID), se = F, size = 0.5, alpha = 0.75, geom="line", linetype = "solid")+
+  stat_smooth(data = ideal_1, aes(x= temp_mean, y=resp_glob), se = F, size = 1, color = "black", alpha = 0.7, geom="line")+
+  geom_point(data = summary, aes(x= temp_mean, y = resp, color = ID), alpha = 0.5)+
+  #scale_colour_scico(palette = "batlow")+
+  scale_colour_discrete(guide = "none")+
+  #scale_linetype_manual(values=c(1,2), guide = "none") + 
+  labs(linetype = "pressure (bar)", x = "temp (°C)", y = expression(O[2]-consumption ~(mg/kg %*% h^-1)))+
+  facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
+  theme(legend.position = c(.05, .95),
+        legend.justification = c("left", "top"),
+        legend.margin = margin(6, 6, 6, 6),
+        legend.box.background = element_rect(color="black", size=1))+
+  theme(text = element_text(size = 10, family = "sans")))
+
+
+fig2b <-  tag_facet2(ggplot(ideal, aes(x=temp_mean, y=resp)) +
+  theme_bw()+
+  geom_point(data = summary, aes(x= temp_mean, y = resp, color = ID, shape = as.factor(npress)), alpha = 0.5)+
+  scale_shape_manual(values = c(1, 16), guide = "none")+
+  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 1))), color = ID), se = F, size = 0.4, geom="line", linetype = "solid")+
+  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 8))), color = ID), se = F, size = 0.4, geom="line", linetype = "dashed")+
+  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 1), level = "0"))), se = F, size = 0.4, color = "black", geom="line", linetype = "solid")+
+  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 8), level = "0"))), se = F, size = 0.4, color = "black", geom="line", linetype = "dashed")+
+  scale_colour_discrete(guide = "none")+
+  labs(linetype = "pressure (bar)", x = "temp (°C)", y = expression(O[2]-consumption ~(mg/kg %*% h^-1)))+
+  facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
+  theme(legend.position = c(.05, .95),
+        legend.justification = c("left", "top"),
+        legend.margin = margin(6, 6, 6, 6),
+        legend.box.background = element_rect(color="black", size=1))+
+  theme(text = element_text(size = 10, family = "sans")))
+
+fig2c <-  tag_facet2(ggplot(ideal, aes(x=temp_mean, y=resp)) +
+  theme_bw()+
+  geom_point(data = summary, aes(x= temp_mean, y = resp, color = speedBL, shape = as.factor(npress)), alpha = 0.5)+
+  scale_shape_manual(values = c(1, 16), guide = "none")+
+  scale_colour_scico(palette = "batlow")+
+  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 1)))), se = F, size = 0.4, geom="line", linetype = "solid", color = "red")+
+  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 8)))), se = F, size = 0.4, geom="line", linetype = "dashed", color = "red")+
+  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 1), level = "0"))), se = F, size = 0.4, color = "black", geom="line", linetype = "solid")+
+  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 8), level = "0"))), se = F, size = 0.4, color = "black", geom="line", linetype = "dashed")+
+  #scale_linetype_manual(values=c(1,2), guide = "none") + 
+  labs(linetype = "pressure (bar)", x = "temp (°C)", y = expression(O[2]-consumption ~(mg/kg %*% h^-1)))+
+  facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
+  theme(legend.key.size = unit(3, "cm"),
+      legend.key.width = unit(0.3, "cm"),
+      legend.title = element_blank(),
+      text = element_text(size = 10, family = "sans")))
+
+fig2d <-  ggplot(ideal_1, aes(x=temp_mean, y=resp)) +
+  #geom_point(aes(colour = temp_mean)), size=1)+ 
+  theme_bw()+
+  stat_smooth(data = ideal_1, aes(x= temp_mean, y=resp, group = ID, color = startmass), se = F, size = 0.5, alpha = 0.75, geom="line", linetype = "dashed")+
+  stat_smooth(data = ideal_1, aes(x= temp_mean, y=resp_glob), se = F, size = 1, color = "black", alpha = 0.7, geom="line")+
+  scale_colour_scico(palette = "batlow")+
+  #scale_colour_discrete(guide = "none")+
+  #scale_linetype_manual(values=c(1,2), guide = "none") + 
   labs(linetype = "pressure (bar)", x = "temp (°C)", y = expression(O[2]-consumption ~(mg/kg %*% h^-1)))+
   theme(legend.position = c(.05, .95),
         legend.justification = c("left", "top"),
         legend.margin = margin(6, 6, 6, 6),
         legend.box.background = element_rect(color="black", size=1))+
-  guides(shape=FALSE)
+  theme(text = element_text(size = 10, family = "sans"))
 
-ggsave("Fig2.pdf", fig2, device = "pdf", height = 7, width = 8, dpi = 300)
+ggsave("Fig2a.pdf", fig2a, device = "pdf", height = 7, width = 8, dpi = 300)
+ggsave("Fig2b.pdf", fig2b, device = "pdf", height = 7, width = 8, dpi = 300)
+ggsave("Fig2c.pdf", fig2c, device = "pdf", height = 7, width = 8, dpi = 300)
+ggsave("Fig2d.pdf", fig2d, device = "pdf", height = 7, width = 8, dpi = 300)
 
-fig2
+fig2a
+fig2b
+fig2c
+fig2d
 
 ```
 
@@ -173,7 +317,7 @@ fig2
 
 ## Graphs/tabs for supplementary
 
-**Tab S1** Summary of
+**Tab S1** Summary of experimental parameters and oxygen consumption grouped by individual, nominal temperature and pressure. Note, that temperature means and ranges are calculated from the mean temperature of individual measurements (since for each measurement only a single oxygen consumption rate is available). 
 
 ```{r}
 
@@ -181,13 +325,29 @@ calc_n <- summary %>% mutate(indicator = paste(ID, ntemp, npress, sep = "_")) %>
                       group_by(indicator) %>% 
                       summarize(n = length(estimate_s))
 
+addresp <- summ_by_ID %>% 
+  ungroup() %>% 
+  mutate(indicator = paste(ID, ntemp, npress, sep = "_")) %>% 
+  select(-ntemp, -npress, -ID) %>%
+  mutate_at(1:8, round, 1) %>% 
+  mutate(t = paste(mean_temp, sd_temp, sep = " \u00B1 "),
+         t_range = paste(min_temp, max_temp, sep = " - "),
+         o = paste(mean_temp, sd_temp, sep = " \u00B1 "),
+         o_range = paste(min_temp, max_temp, sep = " - ")) %>% 
+  select(indicator, t, t_range, o, o_range) %>% 
+  rename("Mean experienced temperature (°C)" = t,
+         "Measured Temperature range (°C)" = t_range,
+         "Mean oxygen consumption (mg/kg/h)" = o,
+         "Oxygen consumption range (mg/kg/h)" = o_range)
+         
 flextable(biomasses %>%
             select(ID, ID_old) %>% 
             left_join(treattime, by = c("ID_old" = "ID")) %>%
             mutate(ntemp = replace(ntemp, ntemp == "15", 15.5),
                    indicator = paste(ID_old, ntemp, npress, sep = "_")) %>%
             left_join(calc_n, by = "indicator") %>%
-            select(-ID_old, -start, -end, -time_h, -indicator) %>%
+            left_join(addresp, by = "indicator") %>% 
+            select(-start, -end, -time_h, -indicator) %>%
             mutate(time_d = round(time_d, 1)) %>%
             rename("nominal pressure (bar)" = npress,
                    "nominal temperature (°C)" = ntemp,
@@ -210,12 +370,15 @@ round_df <- function(x, digits) {
     x
 }
 
+remotes::install_github("davidgohel/flextable")
+library(flextable)
 
-
-
-AIC_scores <- flextable(select.lme %>%
-         mutate_if(is.numeric, round, 2)) %>%   
-  autofit()
+AIC_scores <- select.lme %>%
+         mutate_if(is.numeric, round, 2) %>% 
+         replace(is.na(.), "") %>% 
+         slice(1:5)
+                
+AIC_scores <- flextable(AIC_scores) 
 
 FitFlextableToPage <- function(ft, pgwidth = 6){
 
