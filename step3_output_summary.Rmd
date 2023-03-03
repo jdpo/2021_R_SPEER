@@ -179,10 +179,6 @@ fig1a <- tag_facet2(
       legend.key.width = unit(0.3, "cm"),
       legend.title = element_blank(),
       text = element_text(size = 10, family = "sans"))
-
-#add plot with temp for qual check
-  ggplot(summary, aes(x=datetime_min, y=temp_mean)) +
-    geom_line(aes(col = tunnel))
   
   fig1b <- tag_facet2(
   ggplot(summary, aes(x=ID_time, y=log(resp_absol))) +
@@ -202,7 +198,10 @@ fig1a <- tag_facet2(
 
 #add plot with temp for qual check
   ggplot(summary, aes(x=datetime_min, y=temp_mean)) +
-    geom_line(aes(col = tunnel))
+    theme_bw() +
+    geom_point(aes(col = tunnel, shape = as.factor(npress)), alpha = 0.5)+
+    scale_shape_manual(values = c(1, 16), guide = "none") +
+    theme(legend.position = "none")
   
 
 ggsave("Fig1a.pdf", fig1a, device = "pdf", height = 7, width = 8, dpi = 300)
@@ -347,7 +346,7 @@ flextable(biomasses %>%
                    indicator = paste(ID_old, ntemp, npress, sep = "_")) %>%
             left_join(calc_n, by = "indicator") %>%
             left_join(addresp, by = "indicator") %>% 
-            select(-start, -end, -time_h, -indicator) %>%
+            select(-start, -end, -time_h, -indicator, -ID_old) %>%
             mutate(time_d = round(time_d, 1)) %>%
             rename("nominal pressure (bar)" = npress,
                    "nominal temperature (°C)" = ntemp,
