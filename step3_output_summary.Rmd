@@ -62,12 +62,26 @@ ideal_1 <- ideal %>% filter(press_mean == 1)
 
 
 biomasses$ID <- biomasses$ID %>% str_replace_all(c("a" = "A", "b" = "B", "c" = "C", "d" = "D", "e" = "E", "f" = "F", "g" = "G", "h" = "H", "i" = "I"))
+biomasses$ID_old <- as.factor(biomasses$ID_old)
+swimtime$ID <- as.factor(swimtime$ID)
+
+summ_speed <- summary %>% 
+  group_by(ID) %>% 
+  summarize(speed_min = min(speedBL),
+            speed_max = max(speedBL)) %>%
+  left_join(biomasses, by = c("ID" = "ID_old")) %>% 
+  mutate(ID = ID.y) %>% 
+  select(ID, speed_min, speed_max)
 
 align(flextable(biomasses %>%
             left_join((swimtime %>% select(ID, time_d, distance)), by = c("ID_old" = "ID")) %>%
-            select("ID", "Length (cm)", "Silvering Index*", "Biomass at start (g)", "Biomass at end (g)", "Fat at start (% WM)", "Fat at end (% WM)", "Silvering Index*", "time_d", "distance") %>%
+            left_join(summ_speed, by = "ID") %>%
+            select("ID", "Length (cm)", "Silvering Index*", "Biomass at start (g)", "Biomass at end (g)", "Fat at start (% WM)", "Fat at end (% WM)", "Silvering Index*", "time_d", "distance", "speed_min", "speed_max") %>%
             mutate(time_d = round(time_d, 1),
-                   distance = round(distance, 0)) %>% 
+                   distance = round(distance, 0),
+                   speed_min = round(speed_min, 2),
+                   speed_max = round(speed_max, 2),
+                   "Velocity range (BL/s)" = paste(speed_min, speed_max, sep = " - ")) %>% 
             rename("Swim time (d)" = time_d,
                    "Swimming distance (km)" = distance)) %>% 
   colformat_num(big.mark   = "") %>%
@@ -123,13 +137,10 @@ flextable(summ_by_ID %>%
                    speed_mean = paste(speed_mean, speed_sd, sep =" \u00B1 "), 
                    speed_range = paste(speed_min, speed_max, sep = " - ")) %>%
             ungroup() %>% 
-            select("Nominal Temperature (°C) / Pressure (bar)" , resp_mean, resp_range, temp_mean, temp_range, speed_mean, speed_range) %>%
+            select("Nominal Temperature (°C) / Pressure (bar)" , resp_mean, temp_mean, speed_mean) %>%
             rename("Mean oxygen consupmtion rate (mg/kg/h)" = resp_mean,
-                 "Range of oxygen consumption rates (mg/kg/h)" = resp_range,
                  "Mean observed temperature (°C)" = temp_mean,
-                 "Range of observed temperatures (°C)" = temp_range,
-                 "Mean observed velocity (BL/s)" = speed_mean,
-                 "Range of velocities (BL/s)" = speed_range)
+                 "Mean observed velocity (BL/s)" = speed_mean)
 ) %>% 
   autofit()
                      
