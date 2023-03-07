@@ -1,6 +1,7 @@
 #load data
 
-load("summary_after_rev.RData")
+#load("summary_after_rev.RData")
+load("summary_mod.RData")
 
 #use environment after running step 1
 
@@ -74,9 +75,9 @@ qqline(resid(lme.s))
 
 ######################################### SELECT FIXED EFFECTS STRUCTURE ##################################################
 
-#fit best model by ml as quality check
+#fit best model by ML as quality check
 
-lme.dredge <- lme(log(resp_absol) ~ temp_mean + press_mean + speedBL + run, 
+lme.dredge <- lme(log(resp) ~ temp_mean * press_mean + speedBL + run, 
               random = ~1+speedBL|ID, #fill in the wanted RE structure
               data = summary,
               method ="ML",
@@ -94,6 +95,27 @@ options(na.action = "na.omit")
 setwd("../Ergebnisse")
 write.table(select.lme, file = "select_lme.csv", row.names = FALSE, sep = ";")
 
+#test if interaction is needed
+lme.inter <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
+                  random = ~1+speedBL|ID, #fill in the wanted RE structure
+                  data = summary,
+                  method ="ML",
+                  #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                  correlation = corCAR1(form = ~ ID_time|ID))
+
+lme.nointer<- lme(log(resp) ~ temp_mean + press_mean + speedBL, 
+                  random = ~1+speedBL|ID, #fill in the wanted RE structure
+                  data = summary,
+                  method ="ML",
+                  #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                  correlation = corCAR1(form = ~ ID_time|ID))
+
+
+#compare whether interaction is significant
+lrtest(lme.inter, lme.nointer)
+anova(lme.inter, lme.nointer)
+
+#test if run is needed
 lme.run <- lme(log(resp) ~ temp_mean + press_mean + speedBL + run, 
                   random = ~1+speedBL|ID, #fill in the wanted RE structure
                   data = summary,
@@ -117,7 +139,14 @@ AIC(lme.press, lme.nopress)
 
 ################################ GRAPH MAIN RESULTS ###########################################
 
-lme.plot <- lme.norun
+lme.plot <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
+                random = ~1+speedBL|ID, #fill in the wanted RE structure
+                data = summary,
+                method ="REML",
+                #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                correlation = corCAR1(form = ~ ID_time|ID))
+
+summary(lme.plot)
 
 ID_key <- data.frame(ID = unique(summary$ID),
                      Letter = letters[1:9])

@@ -7,3 +7,5 @@ models_fitted_full.RData
 /output
 summary_after_rev.RData
 summary.RData
+summary_mod_full_inter.RData
+summary_mod.RData

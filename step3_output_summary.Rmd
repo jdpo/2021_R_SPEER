@@ -14,7 +14,7 @@ knitr::opts_knit$set(root.dir = './output')
 knitr::opts_chunk$set(echo=FALSE)
 
 
-load("../summary_mod.RData")
+load("../summary_mod_inter.RData")
 
 
 summary$ID_time <- as.numeric(summary$ID_time)
@@ -51,6 +51,13 @@ ideal$resp <- exp(predict(lme.plot, newdata = ideal, group = ID))
 ideal$resp_glob <- exp(predict(lme.plot, newdata = ideal, level = "0"))
 ideal_1 <- ideal %>% filter(press_mean == 1)
 
+#not used now but possibly useful
+min_max <- expand.grid(ID=unique(summary$ID),
+                     temp_mean=c(12, 12.7, 19.6, 20.7),
+                     press_mean = c(1),
+                     speedBL = c(0.6))
+min_max$resp_glob <- exp(predict(lme.plot, newdata = min_max, level = "0"))
+
 
 ```
 
@@ -62,28 +69,37 @@ ideal_1 <- ideal %>% filter(press_mean == 1)
 
 
 biomasses$ID <- biomasses$ID %>% str_replace_all(c("a" = "A", "b" = "B", "c" = "C", "d" = "D", "e" = "E", "f" = "F", "g" = "G", "h" = "H", "i" = "I"))
-biomasses$ID_old <- as.factor(biomasses$ID_old)
-swimtime$ID <- as.factor(swimtime$ID)
+biomasses_temp<- biomasses %>% 
+  mutate(ID_old = as.factor(biomasses$ID_old))
+         
+swimtime_temp <- swimtime %>%  
+    mutate(ID = as.factor(swimtime$ID))
 
 summ_speed <- summary %>% 
   group_by(ID) %>% 
   summarize(speed_min = min(speedBL),
-            speed_max = max(speedBL)) %>%
-  left_join(biomasses, by = c("ID" = "ID_old")) %>% 
+            speed_max = max(speedBL),
+            temp_min = min(temp_mean),
+            temp_max = max(temp_max)) %>%
+  left_join(biomasses_temp, by = c("ID" = "ID_old")) %>% 
   mutate(ID = ID.y) %>% 
-  select(ID, speed_min, speed_max)
+  select(ID, speed_min, speed_max, temp_min, temp_max)
 
 align(flextable(biomasses %>%
             left_join((swimtime %>% select(ID, time_d, distance)), by = c("ID_old" = "ID")) %>%
             left_join(summ_speed, by = "ID") %>%
-            select("ID", "Length (cm)", "Silvering Index*", "Biomass at start (g)", "Biomass at end (g)", "Fat at start (% WM)", "Fat at end (% WM)", "Silvering Index*", "time_d", "distance", "speed_min", "speed_max") %>%
+            select("ID", "Length (cm)", "Silvering Index*", "Biomass at start (g)", "Biomass at end (g)", "Fat at start (% WM)", "Fat at end (% WM)", "Silvering Index*", "time_d", "distance", "speed_min", "speed_max", "temp_min", "temp_max") %>%
             mutate(time_d = round(time_d, 1),
                    distance = round(distance, 0),
                    speed_min = round(speed_min, 2),
                    speed_max = round(speed_max, 2),
-                   "Velocity range (BL/s)" = paste(speed_min, speed_max, sep = " - ")) %>% 
+                   temp_min = round(temp_min, 1),
+                   temp_max = round(temp_max, 1),
+                   "Velocity range (BL/s)" = paste(speed_min, speed_max, sep = " - "),
+                   "Temperature range (°C)" = paste(temp_min, temp_max, sep = " - ")) %>% 
             rename("Swim time (d)" = time_d,
-                   "Distance (km)" = distance)) %>% 
+                   "Distance (km)" = distance) %>% 
+              select(-speed_min, -speed_max, -temp_min, -temp_max)) %>% 
   colformat_num(big.mark   = "") %>%
   autofit(add_w = -0.5), align = "center", part = "all")
 ```
@@ -198,7 +214,7 @@ fig1a <- tag_facet2(
   theme_bw()+
   scale_shape_manual(values = c(1, 16), guide = "none")+
   scale_colour_scico(palette = "batlow")+ # ,name = "temp (°C)" - this adds title for the specific legend
-  geom_line(aes(x= ID_time, y=predict(lme.plot, level = 0)), size = 0.4)+
+  geom_line(aes(x= ID_time, y=predict(lme.plot, level = 0)), linewidth = 0.4)+
   geom_line(aes(x= ID_time, y=predict(lme.plot), group = ID), linetype = "dashed", size = 0.4)+
   labs(x = expression(time~(h)), y = expression(ln~O[2]-consumption ~(mg/kg %*% h^-1)))+
   facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
