@@ -460,7 +460,7 @@ summary <- summary[order(summary$run, summary$tunnel, summary$datetime_min),]
 setwd("../../Ergebnisse/")
 write.table(summary_raw2, file = "summary_raw.csv", row.names = FALSE, sep = ";")
 write.table(summary, file = "summary_R09.csv", row.names = FALSE, sep = ";")
-
+save(summary, file="../2021_R_SPEER/summary_first_rev.RData")
 #summary <- back
 
 
