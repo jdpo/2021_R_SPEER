@@ -126,7 +126,9 @@ lrtest(lme.norun, lme.norun.nopinter, lme.nopress)
 lrtest(lme.norun, lme.nopress)
 
 lme.plot <- lme.norun
-
+plot(lme.plot)
+qqnorm(resid(lme.plot))
+qqline(resid(lme.plot))
 
 
 ################################ PREPARATIONS TO GRAPH MAIN RESULTS ###########################################
@@ -168,7 +170,7 @@ summary <- summary %>%
 
 #save image and cleaned image
 save.image("models/nlme_after_rev_full.RData")
-rm(list = ls()[!ls() %in% c("ID_key", "run.names", "select.lme", "summary", "summary_short", "tag_facet2", "tunnel.names")])
+rm(list = ls()[!ls() %in% c("ID_key", "run.names", "lme.plot", "select.lme", "summary", "summary_short", "tag_facet2", "tunnel.names")])
 save.image("models/nlme_after_rev_reduced.RData")
 
 ##-------------plot swimming speeds---------------#

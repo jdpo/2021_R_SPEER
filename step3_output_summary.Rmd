@@ -7,6 +7,7 @@ output:
 ---
 ```{r setup}
 knitr::opts_knit$set(root.dir = './output')
+knitr::opts_chunk$set(echo=FALSE, warning = FALSE, message = FALSE)
 
 ```
 
@@ -14,8 +15,7 @@ knitr::opts_knit$set(root.dir = './output')
 knitr::opts_chunk$set(echo=FALSE)
 
 
-load("../summary_mod_inter.RData")
-
+load("../FOR_OUTPUT_RMD.RData")
 
 summary$ID_time <- as.numeric(summary$ID_time)
 summary$run <-as.factor(summary$run)
@@ -23,7 +23,7 @@ summary$tunnel <-as.factor(summary$tunnel)
 summary$ID <- as.factor(summary$ID)
 summary$FR <- summary$front_true/(summary$front_false+summary$front_true)
 summary$ID_press <- paste(summary$ID, summary$npress, sep ="_")
-lme.final <- lme.plot
+
 
 library(nlme)
 library(MuMIn)
@@ -190,7 +190,8 @@ flextable(result %>%
   mutate(Parameter = if_else(Parameter == "(Intercept)", "Intercept", 
                              if_else(Parameter == "temp_mean", "Temperature (°C)",
                              if_else(Parameter == "press_mean", "Pressure (bar)",
-                             if_else(Parameter == "speedBL", "Velocity (BL/s)", "NA")))))) %>%
+                             if_else(Parameter == "speedBL", "Velocity (BL/s)", 
+                             if_else(Parameter == "temp_mean:press_mean", "Temp/Press Interaction", "NA"))))))) %>%
   autofit() 
  
 
@@ -246,6 +247,8 @@ fig1a <- tag_facet2(
     geom_point(aes(col = tunnel, shape = as.factor(npress)), alpha = 0.5)+
     scale_shape_manual(values = c(1, 16), guide = "none") +
     theme(legend.position = "none")
+  
+#add graph with masses for quality check
   
 
 ggsave("Fig1a.pdf", fig1a, device = "pdf", height = 7, width = 8, dpi = 300)
