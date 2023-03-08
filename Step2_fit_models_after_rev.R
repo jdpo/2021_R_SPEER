@@ -88,6 +88,7 @@ summary(lme.dredge)
 plot(lme.dredge)
 qqnorm(resid(lme.dredge))
 qqline(resid(lme.dredge))
+hist(resid(lme.dredge))
 
 options(na.action = "na.fail")
 select.lme <- dredge(lme.dredge, rank = "AIC", m.lim = c(3,NA), evaluate = T)
@@ -96,57 +97,39 @@ setwd("../Ergebnisse")
 write.table(select.lme, file = "select_lme.csv", row.names = FALSE, sep = ";")
 
 #test if interaction is needed
-lme.inter <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
+lme.norun <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
                   random = ~1+speedBL|ID, #fill in the wanted RE structure
                   data = summary,
                   method ="ML",
                   #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
                   correlation = corCAR1(form = ~ ID_time|ID))
 
-lme.nointer<- lme(log(resp) ~ temp_mean + press_mean + speedBL, 
-                  random = ~1+speedBL|ID, #fill in the wanted RE structure
-                  data = summary,
-                  method ="ML",
-                  #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                  correlation = corCAR1(form = ~ ID_time|ID))
+lme.norun.nopinter <-  lme(log(resp) ~ temp_mean + press_mean + speedBL, 
+                       random = ~1+speedBL|ID, #fill in the wanted RE structure
+                       data = summary,
+                       method ="ML",
+                       #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                       correlation = corCAR1(form = ~ ID_time|ID))
 
+lme.nopress <-  lme(log(resp) ~ temp_mean + speedBL + run, 
+                       random = ~1+speedBL|ID, #fill in the wanted RE structure
+                       data = summary,
+                       method ="ML",
+                       #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                       correlation = corCAR1(form = ~ ID_time|ID)) 
 
-#compare whether interaction is significant
-lrtest(lme.inter, lme.nointer)
-anova(lme.inter, lme.nointer)
-
-#test if run is needed
-lme.run <- lme(log(resp) ~ temp_mean + press_mean + speedBL + run, 
-                  random = ~1+speedBL|ID, #fill in the wanted RE structure
-                  data = summary,
-                  method ="ML",
-                  #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                  correlation = corCAR1(form = ~ ID_time|ID))
-
-lme.norun <- lme(log(resp) ~ temp_mean + press_mean + speedBL , 
-                 random = ~1+speedBL|ID, #fill in the wanted RE structure
-                 data = summary,
-                 method ="ML",
-                 #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                 correlation = corCAR1(form = ~ ID_time|ID))
-
-summary(lme.run)
 summary(lme.norun)
-lrtest(lme.run, lme.norun)
-AIC(lme.press, lme.nopress)
+summary(lme.norun.nopinter)
+summary(lme.nopress)
+
+lrtest(lme.norun, lme.norun.nopinter, lme.nopress)
+lrtest(lme.norun, lme.nopress)
+
+lme.plot <- lme.norun
 
 
 
-################################ GRAPH MAIN RESULTS ###########################################
-
-lme.plot <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
-                random = ~1+speedBL|ID, #fill in the wanted RE structure
-                data = summary,
-                method ="REML",
-                #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                correlation = corCAR1(form = ~ ID_time|ID))
-
-summary(lme.plot)
+################################ PREPARATIONS TO GRAPH MAIN RESULTS ###########################################
 
 ID_key <- data.frame(ID = unique(summary$ID),
                      Letter = letters[1:9])
@@ -156,7 +139,7 @@ summary <- summary %>%
   rename(Letter_ID=Letter)
 
 #----------------------Individual predictions plot------------------------#
-{
+
   options(scipen = 999) #turn off scientific notations
   library(ggplot2)
   setwd("C:/Users/pohlmann/Desktop/SPEER/Ergebnisse")
@@ -183,39 +166,44 @@ summary <- summary %>%
                   vjust = vjust, fontface = fontface, family = family, inherit.aes = FALSE)
   }
 
-{
-#-------------plot swimming speeds---------------#
+#save image and cleaned image
+save.image("models/nlme_after_rev_full.RData")
+rm(list = ls()[!ls() %in% c("ID_key", "run.names", "select.lme", "summary", "summary_short", "tag_facet2", "tunnel.names")])
+save.image("models/nlme_after_rev_reduced.RData")
 
-  ggplot(summary, aes(speedBL))+
-    geom_histogram(bins = 25)+
-    facet_wrap(~ID_temp_press)
-
-#----------------------Speed vs Resp-----------------------------#
-
-  ggplot(summary, aes(x=speedBL, y=resp)) +
-    geom_point(size=0.2)+ 
-    theme_bw()+
-    #geom_smooth(aes(linetype = as.factor(npress), colour = as.factor(ntemp)))+
-    #geom_point(aes(x = (speed_s_min/(length/100)), colour = "red"))+
-    #geom_point(aes(x = (speed_s_max/(length/100)), colour = "blue"))+
-    #geom_vline(aes(xintercept = 0.6))+
-    #geom_rect(aes(xmin=0.564, xmax = 0.667, ymin=-Inf, ymax=Inf),alpha = 0.004)+
-    xlim(0.4, 0.8)+
-    facet_grid(ntemp ~ ID_press)+
-    guides(shape=FALSE)
-
-
-#----------------------Speed vs Temp-----------------------------#
-
-  ggplot(summary, aes(x=resp, y=speedBL)) +
-    geom_point(size=0.2)+ 
-    theme_bw()+
-    #geom_smooth(aes(linetype = as.factor(npress), colour = as.factor(ntemp)))+
-    #geom_point(aes(x = (speed_s_min/(length/100)), colour = "red"))+
-    #geom_point(aes(x = (speed_s_max/(length/100)), colour = "blue"))+
-    #geom_vline(aes(xintercept = 0.6))+
-    #geom_rect(aes(xmin=0.564, xmax = 0.667, ymin=-Inf, ymax=Inf),alpha = 0.004)+
-    #xlim(0.4, 0.8)+
-    facet_wrap(~ID)+
-    guides(shape=FALSE)
-}
+##-------------plot swimming speeds---------------#
+#
+#  ggplot(summary, aes(speedBL))+
+#    geom_histogram(bins = 25)+
+#    facet_wrap(~ID_temp_press)
+#
+##----------------------Speed vs Resp-----------------------------#
+#
+#  ggplot(summary, aes(x=speedBL, y=resp)) +
+#    geom_point(size=0.2)+ 
+#    theme_bw()+
+#    #geom_smooth(aes(linetype = as.factor(npress), colour = as.factor(ntemp)))+
+#    #geom_point(aes(x = (speed_s_min/(length/100)), colour = "red"))+
+#    #geom_point(aes(x = (speed_s_max/(length/100)), colour = "blue"))+
+#    #geom_vline(aes(xintercept = 0.6))+
+#    #geom_rect(aes(xmin=0.564, xmax = 0.667, ymin=-Inf, ymax=Inf),alpha = 0.004)+
+#    xlim(0.4, 0.8)+
+#    facet_grid(ntemp ~ ID_press)+
+#    guides(shape=FALSE)
+#
+#
+##----------------------Speed vs Temp-----------------------------#
+#
+#  ggplot(summary, aes(x=resp, y=speedBL)) +
+#    geom_point(size=0.2)+ 
+#    theme_bw()+
+#    #geom_smooth(aes(linetype = as.factor(npress), colour = as.factor(ntemp)))+
+#    #geom_point(aes(x = (speed_s_min/(length/100)), colour = "red"))+
+#    #geom_point(aes(x = (speed_s_max/(length/100)), colour = "blue"))+
+#    #geom_vline(aes(xintercept = 0.6))+
+#    #geom_rect(aes(xmin=0.564, xmax = 0.667, ymin=-Inf, ymax=Inf),alpha = 0.004)+
+#    #xlim(0.4, 0.8)+
+#    facet_wrap(~ID)+
+#    guides(shape=FALSE)
+#
+#
