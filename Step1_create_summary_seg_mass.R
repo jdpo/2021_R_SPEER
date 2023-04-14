@@ -24,7 +24,25 @@ data <- do.call(rbind,lapply(files, fread))
 data$datetime <- as.POSIXct(data$datetime, format = "%Y-%m-%d %H:%M:%S")
 data <- group_by(data, no)
 
-  
+
+########################## REMOVE SINGLE VALUES WITH UNREALISTIC PRESSURES ###################################
+
+#this was done for evaluation, data were not removed at this point but eels where 8 bar pressure was interrupted regularly 
+#were removed completely from analyses (1 Individual, 733256). 
+#One Fish had a drop in pressure for minutes in two measurements, for this ID only the respective measurements were removed
+
+#data$row_ID <- seq.int(nrow(data))
+#data_wrong_press1 <- data[(data$press > 8.5 | data$press < 0.5),]
+#data_wrong_press2 <- data[(data$press > 1.5 & data$press < 7.5),]
+#data_wrong_press <- rbind(data_wrong_press1, data_wrong_press2)
+#
+#save(data_wrong_press, file="../../Ergebnisse/Bereinigung/press_remov_raw.RData")
+#
+#data <- data[!data$row_ID %in% data_wrong_press$row_ID, ]
+#
+#data$row_ID <- NULL
+
+
 ############################################# EXTRACT SWIM SPEEDS FOR EACH ID##########################################################################
   
 

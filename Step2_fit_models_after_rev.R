@@ -21,49 +21,58 @@ library(lme4)
 library(lmerTest)
 library(cAIC4)
 library(MuMIn)
-library(dplyr)
+library(tidyverse)
 library(lmtest)
 
 #reduce dataset
 summary_short <- summary[, names(summary) %in% c("length", "FR"," ntemp", "temp_mean", "press_mean", "ID_time", "speedBL", "run", "tunnel","ID", "resp", "npress"), drop = F]
 summary_corr <- summary_backup[, names(summary_backup) %in% c("temp_mean", "press_mean", "speedBL", "run", "tunnel", "ID_time", "mass"), drop = F]
-summary$mass_g <- summary$mass
-summary$mass <- summary$mass_g/1000
 
+summary <- summary %>% arrange(run, tunnel)
 
+#insert new ID's
+ID_key <- data.frame(ID = unique(summary$ID),
+                     Letter = letters[1:9])
+
+summary <- summary %>% 
+  left_join(ID_key, by = "ID") %>%
+  rename(Letter_ID=Letter)
+
+summary_model <- summary %>% 
+  filter(ID != 733256 & ID != 733279 & no !="575051_19_131" & no !="575051_19_132") 
 
 ########################################### SELECT RANDOM EFFECTS STRUCTURE ##########################################
 
-lme.i <-  lme(log(resp) ~ temp_mean * press_mean + speedBL + run, 
+lme.i <-  lme(log(resp) ~ temp_mean * press_mean + speedBL, 
               random = ~1|ID, 
-              data = summary,
+              data = summary_model,
               method ="REML",
               #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
               correlation = corCAR1(form = ~ ID_time|ID))
 
-lme.s <-  lme(log(resp) ~ temp_mean * press_mean + speedBL + run, 
+lme.s <-  lme(log(resp) ~ temp_mean * press_mean + speedBL, 
             random = ~1+speedBL|ID, 
-            data = summary,
+            data = summary_model,
             method ="REML",
             #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
             correlation = corCAR1(form = ~ ID_time|ID))
 
-lme.t <-  lme(log(resp) ~ temp_mean * press_mean + speedBL + run, 
+lme.t <-  lme(log(resp) ~ temp_mean * press_mean + speedBL, 
               random = ~1+temp_mean|ID, 
-              data = summary,
+              data = summary_model,
               method ="REML",
               #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
               correlation = corCAR1(form = ~ ID_time|ID))
 
-lme.p <-  lme(log(resp) ~ temp_mean * press_mean + speedBL + run, 
+lme.p <-  lme(log(resp) ~ temp_mean * press_mean + speedBL, 
               random = ~1+press_mean|ID, 
-              data = summary,
+              data = summary_model,
               method ="REML",
               #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
               correlation = corCAR1(form = ~ ID_time|ID))
 
 
-lrtest(lme.i, lme.s, lme.t, lme.p)
+lrtest(lme.i, lme.s)
 
 
 summary(lme.s)
@@ -77,9 +86,9 @@ qqline(resid(lme.s))
 
 #fit best model by ML as quality check
 
-lme.dredge <- lme(log(resp) ~ temp_mean * press_mean + speedBL + run, 
+lme.dredge <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
               random = ~1+speedBL|ID, #fill in the wanted RE structure
-              data = summary,
+              data = summary_model,
               method ="ML",
               #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
               correlation = corCAR1(form = ~ ID_time|ID))
@@ -91,54 +100,48 @@ qqline(resid(lme.dredge))
 hist(resid(lme.dredge))
 
 options(na.action = "na.fail")
-select.lme <- dredge(lme.dredge, rank = "AIC", m.lim = c(3,NA), evaluate = T)
+select.lme <- dredge(lme.dredge, rank = "AIC", m.lim = c(1,NA), evaluate = T)
 options(na.action = "na.omit")
 setwd("../Ergebnisse")
 write.table(select.lme, file = "select_lme.csv", row.names = FALSE, sep = ";")
 
-#test if interaction is needed
-lme.norun <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
-                  random = ~1+speedBL|ID, #fill in the wanted RE structure
-                  data = summary,
-                  method ="ML",
-                  #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                  correlation = corCAR1(form = ~ ID_time|ID))
+#statistically compare best model to next best model (that makes sense)
+lme.nointer <- lme(log(resp) ~ temp_mean + temp_mean:press_mean + speedBL, 
+                   random = ~1+speedBL|ID, #fill in the wanted RE structure
+                   data = summary_model,
+                   method ="ML",
+                   #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                   correlation = corCAR1(form = ~ ID_time|ID))
 
-lme.norun.nopinter <-  lme(log(resp) ~ temp_mean + press_mean + speedBL, 
-                       random = ~1+speedBL|ID, #fill in the wanted RE structure
-                       data = summary,
-                       method ="ML",
-                       #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                       correlation = corCAR1(form = ~ ID_time|ID))
+summary(lme.nointer)
+lrtest(lme.dredge, lme.nointer)
+anova(lme.dredge, lme.nointer)
 
-lme.nopress <-  lme(log(resp) ~ temp_mean + speedBL + run, 
-                       random = ~1+speedBL|ID, #fill in the wanted RE structure
-                       data = summary,
-                       method ="ML",
-                       #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
-                       correlation = corCAR1(form = ~ ID_time|ID)) 
 
-summary(lme.norun)
-summary(lme.norun.nopinter)
-summary(lme.nopress)
+#store final model
+lme.plot <- lme(log(resp) ~ temp_mean * press_mean + speedBL, 
+                random = ~1+speedBL|ID, #fill in the wanted RE structure
+                data = summary_model,
+                method ="REML",
+                #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                correlation = corCAR1(form = ~ ID_time|ID))
 
-lrtest(lme.norun, lme.norun.nopinter, lme.nopress)
-lrtest(lme.norun, lme.nopress)
 
-lme.plot <- lme.norun
 plot(lme.plot)
 qqnorm(resid(lme.plot))
 qqline(resid(lme.plot))
 
 
+#save to integrate to output data
+save(select.lme, file="../2021_R_SPEER/models/select_lme.RData")
+save(ID_key, file="../2021_R_SPEER/models/ID_key.RData")
+save(lme.plot, file="../2021_R_SPEER/models/lme_plot.RData")
+save(summary_model,file= "../2021_R_SPEER/models/summary_model.RData")
+save(summary, file = "../2021_R_SPEER/models/summary.RData")
+
 ################################ PREPARATIONS TO GRAPH MAIN RESULTS ###########################################
 
-ID_key <- data.frame(ID = unique(summary$ID),
-                     Letter = letters[1:9])
 
-summary <- summary %>% 
-  left_join(ID_key, by = "ID") %>%
-  rename(Letter_ID=Letter)
 
 #----------------------Individual predictions plot------------------------#
 
