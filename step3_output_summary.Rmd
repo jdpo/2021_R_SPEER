@@ -53,12 +53,18 @@ min_max$resp_glob <- exp(predict(lme.plot, newdata = min_max, level = "0"))
 
 summary <- summary %>% 
   mutate(speedBL_min = speed_min/(length/100),
-         speedBL_max = speed_max/(length/100))
+         speedBL_max = speed_max/(length/100),
+         log_resp = log(resp))
 
 summary_model <- summary_model %>% 
   mutate(speedBL_min = speed_min/(length/100),
          speedBL_max = speed_max/(length/100))
 
+#calculate Q10
+Q10at1 <- (ideal$resp_glob[70]/ideal$resp_glob[1])^(10/(ideal$temp_mean[70]-ideal$temp_mean[1]))
+Q10at8 <- (ideal$resp_glob[140]/ideal$resp_glob[71])^(10/(ideal$temp_mean[140]-ideal$temp_mean[71]))
+Q10 <- rbind(Q10at1, Q10at8)
+flextable(as.data.frame(Q10))
 ```
 
 ## Tables for manuscript
@@ -200,12 +206,12 @@ flextable(summ_by_ID %>%
 
 ```{r Tab 2}
 
-intervals <- intervals(lme.plot)
+intervals <- intervals(lme.plot.center)
 intervals <- data.frame(intervals$fixed)
 intervals <- intervals %>%
             rename(Lower_confidence_limit = lower,
                    Upper_confidence_limit = upper)
-result <- as.data.frame(coef(summary(lme.plot)))
+result <- as.data.frame(coef(summary(lme.plot.center)))
 result$p <- result$'p-value'
 result$Parameter <- rownames(result)
 intervals$rownames <- rownames(intervals)
@@ -219,10 +225,10 @@ flextable(result %>%
          Value = round(Value, 3)) %>%
   select(c('Parameter', 'Value', 'Lower conf. limit', 'Upper conf. limit', 'p')) %>% 
   mutate(Parameter = if_else(Parameter == "(Intercept)", "Intercept", 
-                             if_else(Parameter == "temp_mean", "Temperature (°C)",
-                             if_else(Parameter == "press_mean", "Pressure (bar)",
-                             if_else(Parameter == "speedBL", "Velocity (BL/s)", 
-                             if_else(Parameter == "temp_mean:press_mean", "Temp/Press Interaction", "NA"))))))) %>%
+                             if_else(Parameter == "temp_mean_center", "Temperature (°C)",
+                             if_else(Parameter == "press_mean_center", "Pressure (bar)",
+                             if_else(Parameter == "speedBL_center", "Velocity (BL/s)", 
+                             if_else(Parameter == "temp_mean_center:press_mean_center", "Temp/Press Interaction", "NA"))))))) %>%
   autofit() 
  
 
@@ -307,17 +313,17 @@ flextable(result %>%
 #      text = element_text(size = 10, family = "sans")))
 
 fig2c <-  tag_facet2(
-  ggplot(summary, aes(x=temp_mean, y=resp)) +
+  ggplot(summary, aes(x=temp_mean, y=log_resp)) +
   theme_bw()+
-  geom_point(aes(x= temp_mean, y = resp, color = speedBL, shape = as.factor(npress)), alpha = 0.5)+
+  geom_point(aes(x= temp_mean, y = log_resp, color = speedBL, shape = as.factor(npress)), alpha = 0.5)+
   scale_shape_manual(values = c(16, 1), guide = "none")+
   scale_colour_scico(palette = "batlow")+
-  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 1)))), se = F, size = 0.4, geom="line", linetype = "solid", color = "red")+
-  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 8)))), se = F, size = 0.4, geom="line", linetype = "dashed", color = "red")+
-  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 1), level = "0"))), se = F, size = 0.4, color = "black", geom="line", linetype = "solid")+
-  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=exp(predict(lme.plot, newdata = ideal %>% filter(press_mean == 8), level = "0"))), se = F, size = 0.4, color = "black", geom="line", linetype = "dashed")+
+  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=predict(lme.plot, newdata = ideal %>% filter(press_mean == 1))), se = F, size = 0.4, geom="line", linetype = "solid", color = "red")+
+  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=predict(lme.plot, newdata = ideal %>% filter(press_mean == 8))), se = F, size = 0.4, geom="line", linetype = "dashed", color = "red")+
+  stat_smooth(data = ideal %>% filter(press_mean == 1), aes(x= temp_mean, y=predict(lme.plot, newdata = ideal %>% filter(press_mean == 1), level = "0")), se = F, size = 0.4, color = "black", geom="line", linetype = "solid")+
+  stat_smooth(data = ideal %>% filter(press_mean == 8), aes(x= temp_mean, y=predict(lme.plot, newdata = ideal %>% filter(press_mean == 8), level = "0")), se = F, size = 0.4, color = "black", geom="line", linetype = "dashed")+
   #scale_linetype_manual(values=c(1,2), guide = "none") + 
-  labs(linetype = "pressure (bar)", x = "temp (°C)", y = expression(O[2]-consumption ~(mg/kg %*% h^-1)))+
+  labs(linetype = "pressure (bar)", x = "temp (°C)", y = expression(ln(O[2]-consumption ~(mg/kg %*% h^-1))))+
   facet_grid(run ~ tunnel, labeller = labeller(tunnel = tunnel.names, run = run.names))+
   guides(scale="none"), open ="", close ="", hjust = -1.2) +
   theme(legend.key.size = unit(3, "cm"),

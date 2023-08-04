@@ -41,6 +41,12 @@ summary <- summary %>%
 summary_model <- summary %>% 
   filter(ID != 733256 & ID != 733279 & no !="575051_19_131" & no !="575051_19_132") 
 
+#add mean centered data to data frame
+summary_model <- summary_model %>% 
+  mutate(temp_mean_center = scale(temp_mean, center = T, scale = F),
+         press_mean_center = scale(press_mean, center = T, scale = F),
+         speedBL_center = scale(speedBL, center = T, scale = F)) 
+
 ########################################### SELECT RANDOM EFFECTS STRUCTURE ##########################################
 
 lme.i <-  lme(log(resp) ~ temp_mean * press_mean + speedBL, 
@@ -126,16 +132,26 @@ lme.plot <- lme(log(resp) ~ temp_mean * press_mean + speedBL,
                 #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
                 correlation = corCAR1(form = ~ ID_time|ID))
 
+lme.plot.center <- lme(log(resp) ~ temp_mean_center * press_mean_center + speedBL_center, 
+                random = ~1+speedBL_center|ID, #fill in the wanted RE structure
+                data = summary_model,
+                method ="REML",
+                #control = lmeControl(maxIter = 10000, msMaxIter = 100000, msTol = 0.005, tolerance = 0.005, pnlsTol = 0.005, pnlsMaxIter =1000, niterEM = 1000),
+                correlation = corCAR1(form = ~ ID_time|ID))
+
 
 plot(lme.plot)
 qqnorm(resid(lme.plot))
 qqline(resid(lme.plot))
+summary(lme.plot.center)
+summary(lme.plot)
 
 
 #save to integrate to output data
 save(select.lme, file="../2021_R_SPEER/models/select_lme.RData")
 save(ID_key, file="../2021_R_SPEER/models/ID_key.RData")
 save(lme.plot, file="../2021_R_SPEER/models/lme_plot.RData")
+save(lme.plot.center, file="../2021_R_SPEER/models/lme_plot_center.RData")
 save(summary_model,file= "../2021_R_SPEER/models/summary_model.RData")
 save(summary, file = "../2021_R_SPEER/models/summary.RData")
 
